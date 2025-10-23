@@ -49,7 +49,7 @@ def evaluation(env, model, render_last, eval_num=100):
 
 
 if __name__ == "__main__":
-    model_path = "models/sample_model/best"  # Change path name to load different models
+    model_path = "models/DQN_model/best"  # Change path name to load different models
     env = gym.make('2048-eval')
 
     ### Load model with SB3

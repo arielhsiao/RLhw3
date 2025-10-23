@@ -65,7 +65,7 @@ class My2048Env(gym.Env):
         self.observation_space = spaces.Box(0, 1, (layers, self.w, self.h), dtype=int)
         
         # TODO: Set negative reward (penalty) for illegal moves (optional)
-        self.set_illegal_move_reward(0.)
+        self.set_illegal_move_reward(-10)
         
         self.set_max_tile(None)
 
@@ -119,20 +119,23 @@ class My2048Env(gym.Env):
 
             # TODO: Add reward according to weighted states (optional)
             weight = np.array([
+                    [1  , 0  , 0  , 1  ],
                     [0  , 0  , 0  , 0  ],
                     [0  , 0  , 0  , 0  ],
-                    [0  , 0  , 0  , 0  ],
-                    [0  , 0  , 0  , 0  ]])
-            reward += 0
+                    [1  , 0  , 0  , 1  ]])
+            weighted_score = np.sum(self.Matrix * weight)
+            #reward += 0.02 * weighted_score
+            reward += 0 
             
         except IllegalMove:
             logging.debug("Illegal move")
             info['illegal_move'] = True
             reward = self.illegal_move_reward
-
+            self.foul_count += 1
+            if self.foul_count >= 6:
+                done = True
             # TODO: Modify this part for the agent to have a chance to explore other actions (optional)
-            done = True
-
+            
         truncate = False
         info['highest'] = self.highest()
         info['score']   = self.score
