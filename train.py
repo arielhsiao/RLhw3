@@ -36,9 +36,9 @@ class FlatFeaturesExtractor(BaseFeaturesExtractor):
 # Set hyper params (configurations) for training
 my_config = {
     "run_id": "example",
-    "algorithm": PPO,
+    "algorithm": DQN,
     "policy_network": "CnnPolicy",
-    "save_path": "models/DQN_model",
+    "save_path": "models/DQN_model_illegal100",
     "num_train_envs": 4,
     "epoch_num": 1000,
     "timesteps_per_epoch": 100,
@@ -88,6 +88,8 @@ def train(eval_env, model, config):
     current_best_score = 0
     current_best_highest = 0
     maxc=0
+    lowest_maxc=0
+    min_eps=0
     start_time = time.time()
     for epoch in range(config["epoch_num"]):
         epoch_start_time = time.time()
@@ -96,10 +98,10 @@ def train(eval_env, model, config):
         model.learn(
             total_timesteps=config["timesteps_per_epoch"],
             reset_num_timesteps=False,
-            # callback=WandbCallback(
-            #     gradient_save_freq=100,
-            #     verbose=2,
-            # ),
+            callback=WandbCallback(
+                gradient_save_freq=100,
+                verbose=2,
+            ),
         )
 
         epoch_duration = time.time() - epoch_start_time
@@ -123,10 +125,10 @@ def train(eval_env, model, config):
         print(f"   - Avg Highest Tile: {avg_highest:.1f}")
 
 
-        # wandb.log(
-        #     {"avg_highest": avg_highest,
-        #      "avg_score": avg_score}
-        # )
+        wandb.log(
+            {"avg_highest": avg_highest,
+             "avg_score": avg_score}
+        )
         
 
         ### Save best model avg score or avg highest tile max value的model
@@ -135,7 +137,11 @@ def train(eval_env, model, config):
             maxc = maxv
             save_path = config["save_path"]
             model.save(f"{save_path}/best")
+        if lowest_maxc < maxv:
+            lowest_maxc = maxv
+            min_eps = epoch
         print("-"*60)
+        print("maxc", maxc, "min_eps", min_eps)
         
 
     total_time = (time.time() - start_time)
@@ -147,13 +153,13 @@ def train(eval_env, model, config):
 
 if __name__ == "__main__":
 
-    # Create wandb session (Uncomment to enable wandb logging)
-    # run = wandb.init(
-    #     project="assignment_3",
-    #     config=my_config,
-    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-    #     id=my_config["run_id"]
-    # )
+    #Create wandb session (Uncomment to enable wandb logging)
+    run = wandb.init(
+        project="assignment_3",
+        config=my_config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        id=my_config["run_id"]
+    )
 
     train_env = SubprocVecEnv([make_env for _ in range(my_config["num_train_envs"])])
 
