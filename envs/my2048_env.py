@@ -132,7 +132,7 @@ class My2048Env(gym.Env):
             info['illegal_move'] = True
             reward = self.illegal_move_reward
             self.foul_count += 1
-            if self.foul_count >= 6:
+            if self.foul_count >= 100:
                 done = True
             # TODO: Modify this part for the agent to have a chance to explore other actions (optional)
             
