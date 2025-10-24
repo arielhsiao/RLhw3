@@ -35,10 +35,10 @@ class FlatFeaturesExtractor(BaseFeaturesExtractor):
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "example",
-    "algorithm": DQN,
+    "run_id": "PPO_model_illegal100",
+    "algorithm": PPO,
     "policy_network": "CnnPolicy",
-    "save_path": "models/DQN_model_illegal100",
+    "save_path": "models/PPO_model_illegal100",
     "num_train_envs": 4,
     "epoch_num": 1000,
     "timesteps_per_epoch": 100,
@@ -130,13 +130,27 @@ def train(eval_env, model, config):
              "avg_score": avg_score}
         )
         
+        ### Save best model
+   
+        if current_best_score < avg_score or current_best_highest < avg_highest:
+            print("Saving New Best Model")
+            if current_best_score < avg_score:
+                current_best_score = avg_score
+                print(f"   - Previous best score: {current_best_score:.1f} → {avg_score:.1f}")
+            elif current_best_highest < avg_highest:
+                current_best_highest = avg_highest
+                print(f"   - Previous best tile: {current_best_highest:.1f} → {avg_highest:.1f}")
+
+            save_path = config["save_path"]
+            model.save(f"{save_path}/bestavgscorebyTA")
+        print("-"*60)
 
         ### Save best model avg score or avg highest tile max value的model
         # episode最大的tile最大值
         if maxc <= maxv:
             maxc = maxv
             save_path = config["save_path"]
-            model.save(f"{save_path}/best")
+            model.save(f"{save_path}/bestbymax")
         if lowest_maxc < maxv:
             lowest_maxc = maxv
             min_eps = epoch
