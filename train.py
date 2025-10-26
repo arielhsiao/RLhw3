@@ -3,12 +3,13 @@ import time
 import gymnasium as gym
 from gymnasium.envs.registration import register
 import numpy as np
-import torch
+import torch as th
 from torch import nn
-
+from gymnasium import spaces
+import torch.nn as nn
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import wandb
 from wandb.integration.sb3 import WandbCallback
-
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC, TD3
@@ -22,28 +23,137 @@ register(
 # Custom features extractor to use with CnnPolicy without requiring NatureCNN/image obs
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
-class FlatFeaturesExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space, features_dim: int = 256):
+class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
+    def __init__(self, observation_space: spaces.Box, features_dim: int = 6144):
         super().__init__(observation_space, features_dim)
-        self.flatten = nn.Flatten()
+        
+        n_input_channels = observation_space.shape[0] # 應為 16
+        
+        # 檢查輸入維度是否符合
+        if n_input_channels != 16 or observation_space.shape[1:] != (4, 4):
+            print(f"Warning: This network (CNN22) is designed for 16x4x4 observations, "
+                  f"but got {observation_space.shape}. Make sure this is intended.")
+
+        # CNN layers
+        self.cnn = nn.Sequential(
+            # Input: (N, 16, 4, 4)
+            # 1. conv (2x2) 256 -> ReLU
+            nn.Conv2d(n_input_channels, 256, kernel_size=2, stride=1, padding=0),
+            nn.ReLU(),
+            # Output: (N, 256, 3, 3)
+            
+            # 2. conv (2x2) 512 -> ReLU但
+            nn.Conv2d(256, 512, kernel_size=2, stride=1, padding=0),
+            nn.ReLU(),
+            # Output: (N, 512, 2, 2)
+            
+            # 3. Flatten
+            nn.Flatten(),
+            # Output: (N, 512 * 2 * 2) = (N, 2048)
+        )
+
+        # ---------------------------------------------------------------------
+        # 這部分用於動態計算展平後的大小，確保 `n_flatten` 正確
+        # 即使我們已經手動算過 (2048)，這樣做更保險
+        with th.no_grad():
+            # 建立一個符合 observation_space 的假輸入
+            sample_input = th.zeros(1, *observation_space.shape)
+            n_flatten = self.cnn(sample_input).shape[1] # 應為 2048
+        # ---------------------------------------------------------------------
+
+        # Fully connected layers
+        self.linear = nn.Sequential(
+            # 4. FC 1024 -> ReLU
+            nn.Linear(n_flatten, 1024),
+            nn.ReLU(),
+            
+            # 5. FC 256 -> ReLU (This is the features_dim)
+            nn.Linear(1024, 256),
+            nn.ReLU()
+            # Output: (N, 256)
+        )
 
 
-    def forward(self, observations):
-        x = observations.float()
-        x = self.flatten(x)
-        return x
+    def forward(self, obs: th.Tensor) -> th.Tensor:
+        '''
+        B = obs.shape[0]
+        dev = obs.device
+
+        # Convert one-hot to discrete tile indices (0-15)
+        tile_id = th.argmax(obs, dim=1)  # (B, 4, 4)
+
+        # ----- Pairwise adjacency (horizontal + vertical) -----
+        horiz_l = tile_id[:, :, :-1].reshape(B, -1)
+        horiz_r = tile_id[:, :, 1:].reshape(B, -1)
+        vert_t = tile_id[:, :-1, :].reshape(B, -1)
+        vert_b = tile_id[:, 1:, :].reshape(B, -1)
+
+        first_pair = th.cat([horiz_l, vert_t], dim=1)
+        second_pair = th.cat([horiz_r, vert_b], dim=1)
+        n_pairs = first_pair.shape[1]
+
+        pair_matrix = th.zeros(B, n_pairs, 16, 16, device=dev)
+        b_idx = th.arange(B, device=dev).repeat_interleave(n_pairs)
+        p_idx = th.arange(n_pairs, device=dev).repeat(B)
+        a_flat, b_flat = first_pair.reshape(-1), second_pair.reshape(-1)
+        pair_matrix[b_idx, p_idx, a_flat, b_flat] = 1
+
+        # ----- Triplet adjacency (horizontal + vertical) -----
+        L = tile_id[:, :, :-2].reshape(B, -1)
+        C = tile_id[:, :, 1:-1].reshape(B, -1)
+        R = tile_id[:, :, 2:].reshape(B, -1)
+        T = tile_id[:, :-2, :].reshape(B, -1)
+        M = tile_id[:, 1:-1, :].reshape(B, -1)
+        D = tile_id[:, 2:, :].reshape(B, -1)
+
+        first_tri = th.cat([L, T], dim=1)
+        mid_tri = th.cat([C, M], dim=1)
+        last_tri = th.cat([R, D], dim=1)
+        n_triplets = first_tri.shape[1]
+
+        tri_tensor = th.zeros(B, n_triplets, 16, 16, 16, device=dev)
+        b_tri_idx = th.arange(B, device=dev).repeat_interleave(n_triplets)
+        seq_idx = th.arange(n_triplets, device=dev).repeat(B)
+        triples = th.stack([first_tri, mid_tri, last_tri], dim=2).reshape(-1, 3)
+        t1, t2, t3 = triples[:, 0], triples[:, 1], triples[:, 2]
+        tri_tensor[b_tri_idx, seq_idx, t1, t2, t3] = 1
+
+        # ----- Flatten all features -----
+        flat_pairs = pair_matrix.reshape(B, -1)
+        flat_triplets = tri_tensor.reshape(B, -1)
+        '''
+        flat_obs = self.linear(self.cnn(obs))
+        flat_obs = flat_obs.flatten(start_dim=1)
+
+        # features = th.cat([flat_pairs, flat_triplets, flat_obs], dim=1)
+        return flat_obs
+
+
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "PPO_model_illegal100",
-    "algorithm": PPO,
-    "policy_network": "CnnPolicy",
-    "save_path": "models/PPO_model_illegal100",
+    "run_id": "DQN_paper1026onlycnn",
+    "algorithm": DQN,
+    "policy_network": "MlpPolicy",
+    "save_path": "models/DQN_paper1026onlycnn",
     "num_train_envs": 4,
     "epoch_num": 1000,
     "timesteps_per_epoch": 100,
     "eval_episode_num": 100,
+
+    ### DQN 參數
+    "batch_size": 32,
+    "learning_rate": 2e-4,
+    "learning_starts": 100,
+    "buffer_size": 1000000,
+    "train_freq": (4, "step"),
+    "gradient_steps": 1,
+    "gamma": 0.99,
+    "target_update_interval": 10000,
+    "exploration_fraction": 0.1,
+    "exploration_final_eps": 0.05,
 }
+
 
 def make_env():
     env = gym.make('2048-v0')
@@ -150,12 +260,15 @@ def train(eval_env, model, config):
         if maxc <= maxv:
             maxc = maxv
             save_path = config["save_path"]
-            model.save(f"{save_path}/bestbymax")
+            model.save(f"{save_path}/bestbymaxc")
+            max_eps = epoch
         if lowest_maxc < maxv:
             lowest_maxc = maxv
             min_eps = epoch
         print("-"*60)
-        print("maxc", maxc, "min_eps", min_eps)
+        print("maxc=", maxc, "min_eps=", min_eps, "max_eps=", max_eps)
+
+        print("---------------")
         
 
     total_time = (time.time() - start_time)
@@ -182,9 +295,10 @@ if __name__ == "__main__":
     # Create model from loaded config and train
     # Note: Set verbose to 0 if you don't want info messages
     policy_kwargs = dict(
-        features_extractor_class=FlatFeaturesExtractor,
+        features_extractor_class= AdjacentTileFeatureExtractor,
         features_extractor_kwargs=dict(features_dim=256),
-        normalize_images=False,
+        #features_extractor_kwargs=dict(features_dim=71936),
+        net_arch=[] 
     )
     model = my_config["algorithm"](
         my_config["policy_network"], 
@@ -193,4 +307,6 @@ if __name__ == "__main__":
         tensorboard_log=my_config["run_id"],
         policy_kwargs=policy_kwargs,
     )
+    print(model.policy)
+    quit()
     train(eval_env, model, my_config)
