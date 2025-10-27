@@ -66,10 +66,8 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
             # 4. FC 1024 -> ReLU
             nn.Linear(n_flatten, 1024),
             nn.ReLU(),
-            
             # 5. FC 256 -> ReLU (This is the features_dim)
             nn.Linear(1024, 256),
-            nn.ReLU()
             # Output: (N, 256)
         )
 
@@ -132,13 +130,13 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "DQN_paper1026onlycnn",
+    "run_id": "DQN_alex_withrelu",
     "algorithm": DQN,
-    "policy_network": "MlpPolicy",
-    "save_path": "models/DQN_paper1026onlycnn",
+    "policy_network": "CnnPolicy",
+    "save_path": "models/DQN_alex_withrelu",
     "num_train_envs": 4,
     "epoch_num": 1000,
-    "timesteps_per_epoch": 100,
+    "timesteps_per_epoch": 20000,
     "eval_episode_num": 100,
 
     ### DQN 參數
@@ -308,5 +306,5 @@ if __name__ == "__main__":
         policy_kwargs=policy_kwargs,
     )
     print(model.policy)
-    quit()
+
     train(eval_env, model, my_config)
