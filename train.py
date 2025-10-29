@@ -73,7 +73,7 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
 
 
     def forward(self, obs: th.Tensor) -> th.Tensor:
-        '''
+       
         B = obs.shape[0]
         dev = obs.device
 
@@ -119,7 +119,6 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
         # ----- Flatten all features -----
         flat_pairs = pair_matrix.reshape(B, -1)
         flat_triplets = tri_tensor.reshape(B, -1)
-        '''
         flat_obs = self.linear(self.cnn(obs))
         flat_obs = flat_obs.flatten(start_dim=1)
 
@@ -130,10 +129,10 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "DQN_alex_withrelu",
+    "run_id": "DQN_alex_withrelu+adj_round2",
     "algorithm": DQN,
     "policy_network": "CnnPolicy",
-    "save_path": "models/DQN_alex_withrelu",
+    "save_path": "models/DQN_alex_withrelu+adj_round2",
     "num_train_envs": 4,
     "epoch_num": 1000,
     "timesteps_per_epoch": 20000,
@@ -148,7 +147,8 @@ my_config = {
     "gradient_steps": 1,
     "gamma": 0.99,
     "target_update_interval": 10000,
-    "exploration_fraction": 0.1,
+    #"exploration_fraction": 0.1,
+    "exploration_fraction": 0.02,
     "exploration_final_eps": 0.05,
 }
 
@@ -294,10 +294,11 @@ if __name__ == "__main__":
     # Note: Set verbose to 0 if you don't want info messages
     policy_kwargs = dict(
         features_extractor_class= AdjacentTileFeatureExtractor,
-        features_extractor_kwargs=dict(features_dim=256),
-        #features_extractor_kwargs=dict(features_dim=71936),
+        #features_extractor_kwargs=dict(features_dim=256),
+        features_extractor_kwargs=dict(features_dim=71936),
         net_arch=[] 
     )
+    '''
     model = my_config["algorithm"](
         my_config["policy_network"], 
         train_env, 
@@ -305,6 +306,36 @@ if __name__ == "__main__":
         tensorboard_log=my_config["run_id"],
         policy_kwargs=policy_kwargs,
     )
+    '''
+
+    # ========= 修改開始 =========
+    from pathlib import Path
+    model_path = Path("models/DQN_alex_withrelu+adj/bestavgscorebyTA.zip")
+
+    if model_path.exists():
+        print(f"✅ Loading model from {model_path}")
+        model = DQN.load(model_path, env=train_env)
+        model.set_env(train_env)  # 確保 VecEnv 正確綁定
+    else:
+        print("🚀 Starting new training from scratch")
+        model = my_config["algorithm"](
+            my_config["policy_network"],
+            train_env,
+            verbose=1,
+            tensorboard_log=my_config["run_id"],
+            policy_kwargs=policy_kwargs,
+            learning_rate=my_config["learning_rate"],
+            batch_size=my_config["batch_size"],
+            buffer_size=my_config["buffer_size"],
+            train_freq=my_config["train_freq"],
+            gradient_steps=my_config["gradient_steps"],
+            gamma=my_config["gamma"],
+            target_update_interval=my_config["target_update_interval"],
+            exploration_fraction=my_config["exploration_fraction"],
+            exploration_final_eps=my_config["exploration_final_eps"],
+        )
+    # ========= 修改結束 =========
+    
     print(model.policy)
 
     train(eval_env, model, my_config)
