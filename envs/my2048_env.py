@@ -115,17 +115,19 @@ class My2048Env(gym.Env):
             assert score <= 2**(self.w*self.h)
             self.add_tile()
             done = self.isend()
+            score = np.tanh(np.log2(score + 1)/4) 
             reward = float(score)
 
             # TODO: Add reward according to weighted states (optional)
             weight = np.array([
-                    [1  , 0  , 0  , 1  ],
-                    [0  , 0  , 0  , 0  ],
-                    [0  , 0  , 0  , 0  ],
-                    [1  , 0  , 0  , 1  ]])
-            weighted_score = np.sum(self.Matrix * weight)
+                    [1  , 0.5  , 0.5  , 1 ],
+                    [0.5  , 0  , 0  , 0.5  ],
+                    [0.5  , 0  , 0  , 0.5  ],
+                    [1  , 0.5  , 0.5  , 1  ]
+                    ])
+            weighted_score = np.sum((self.Matrix - pre_state) * weight)
             #reward += 0.02 * weighted_score
-            reward += 0 
+            reward += weighted_score
             
         except IllegalMove:
             logging.debug("Illegal move")

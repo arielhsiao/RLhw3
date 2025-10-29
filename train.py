@@ -129,10 +129,10 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "DQN_alex_withrelu+adj_round2",
+    "run_id": "DQN_ariel_cnnnoadj",
     "algorithm": DQN,
     "policy_network": "CnnPolicy",
-    "save_path": "models/DQN_alex_withrelu+adj_round2",
+    "save_path": "models/DQN_ariel_cnnnoadj",
     "num_train_envs": 4,
     "epoch_num": 1000,
     "timesteps_per_epoch": 20000,
@@ -147,8 +147,7 @@ my_config = {
     "gradient_steps": 1,
     "gamma": 0.99,
     "target_update_interval": 10000,
-    #"exploration_fraction": 0.1,
-    "exploration_fraction": 0.02,
+    "exploration_fraction": 0.1,
     "exploration_final_eps": 0.05,
 }
 
@@ -294,8 +293,8 @@ if __name__ == "__main__":
     # Note: Set verbose to 0 if you don't want info messages
     policy_kwargs = dict(
         features_extractor_class= AdjacentTileFeatureExtractor,
-        #features_extractor_kwargs=dict(features_dim=256),
-        features_extractor_kwargs=dict(features_dim=71936),
+        features_extractor_kwargs=dict(features_dim=256),
+        # features_extractor_kwargs=dict(features_dim=71936),
         net_arch=[] 
     )
     '''
