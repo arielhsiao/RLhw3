@@ -110,31 +110,60 @@ class My2048Env(gym.Env):
         try:
             # assert info['illegal_move'] == False
             pre_state = self.Matrix.copy()
+            log_pre_state = np.log2(pre_state + 1.0)
             score = float(self.move(action))
+            log_after_state = np.log2(self.Matrix + 1.0)
             self.score += score
             assert score <= 2**(self.w*self.h)
             self.add_tile()
             done = self.isend()
-            score = np.tanh(np.log2(score + 1)/4) 
-            reward = float(score)
+            score = np.tanh(np.log2(score + 1)/3) 
+            reward = 0.5*float(score)
 
             # TODO: Add reward according to weighted states (optional)
+            '''
             weight = np.array([
                     [1  , 0.5  , 0.5  , 1 ],
                     [0.5  , 0  , 0  , 0.5  ],
                     [0.5  , 0  , 0  , 0.5  ],
                     [1  , 0.5  , 0.5  , 1  ]
                     ])
-            weighted_score = np.sum((self.Matrix - pre_state) * weight)
+            '''
+
+            # weight =  [[1.   0.95 0.9  0.85]
+            # [0.65 0.7  0.75 0.8 ]
+            # [0.6  0.55 0.5  0.45]
+            # [0.25 0.3  0.35 0.4 ]]
+
+            # Automatically generate snake-like weight matrix
+            base = np.linspace(1.0, 0.2, 16).reshape(4, 4)
+            weight = np.zeros_like(base)
+            snake_indices = [(i, j if i % 2 == 0 else 3 - j) for i in range(4) for j in range(4)]
+            for idx, (x, y) in enumerate(snake_indices):
+                weight[x, y] = 1.0 - 0.05 * idx  # decrease gradually along snake path
+            #print("weight = ",weight)
+            weighted_score = np.sum((log_after_state - log_pre_state) * weight)
             #reward += 0.02 * weighted_score
             reward += weighted_score
+
+            curve_prelog = -(np.sum(np.abs(log_pre_state[:,1:]-log_pre_state[:,:-1]))+np.sum(np.abs(log_pre_state[1:, :] - log_pre_state[:-1, :])))
+            curve_afterlog = -(np.sum(np.abs(log_after_state[:,1:]-log_after_state[:,:-1]))+np.sum(np.abs(log_after_state[1:, :] - log_after_state[:-1, :])))
+            curve_delta = curve_prelog - curve_afterlog
+            reward += 0.05 * curve_delta
+
+            prev_max = np.max(pre_state)
+            curr_max = np.max(self.Matrix)
+            if curr_max > prev_max:
+                step_bonus = 0.2 * np.log2(curr_max)
+                reward += step_bonus
+            
             
         except IllegalMove:
             logging.debug("Illegal move")
             info['illegal_move'] = True
-            reward = self.illegal_move_reward
+            reward = self.illegal_move_reward + self.illegal_move_reward*self.foul_count
             self.foul_count += 1
-            if self.foul_count >= 100:
+            if self.foul_count >= 50: 
                 done = True
             # TODO: Modify this part for the agent to have a chance to explore other actions (optional)
             
