@@ -68,6 +68,7 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
             nn.ReLU(),
             # 5. FC 256 -> ReLU (This is the features_dim)
             nn.Linear(1024, 256),
+            nn.ReLU(),
             # Output: (N, 256)
         )
 
@@ -129,12 +130,12 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "DQN_ariel_cnnnoadj",
+    "run_id": "DQN_ariel_cnnnoadj_allmodified",
     "algorithm": DQN,
     "policy_network": "CnnPolicy",
-    "save_path": "models/DQN_ariel_cnnnoadj",
+    "save_path": "models/DQN_ariel_cnnnoadj_allmodified",
     "num_train_envs": 4,
-    "epoch_num": 1000,
+    "epoch_num": 1500,
     "timesteps_per_epoch": 20000,
     "eval_episode_num": 100,
 
@@ -297,16 +298,33 @@ if __name__ == "__main__":
         # features_extractor_kwargs=dict(features_dim=71936),
         net_arch=[] 
     )
-    '''
+
+    # model = my_config["algorithm"](
+    #     my_config["policy_network"], 
+    #     train_env, 
+    #     verbose=1,
+    #     tensorboard_log=my_config["run_id"],
+    #     policy_kwargs=policy_kwargs,
+    # )
+
     model = my_config["algorithm"](
-        my_config["policy_network"], 
-        train_env, 
+        my_config["policy_network"],
+        train_env,
         verbose=1,
         tensorboard_log=my_config["run_id"],
         policy_kwargs=policy_kwargs,
+        learning_rate=my_config["learning_rate"],
+        batch_size=my_config["batch_size"],
+        buffer_size=my_config["buffer_size"],
+        train_freq=my_config["train_freq"],
+        gradient_steps=my_config["gradient_steps"],
+        gamma=my_config["gamma"],
+        target_update_interval=my_config["target_update_interval"],
+        exploration_fraction=my_config["exploration_fraction"],
+        exploration_final_eps=my_config["exploration_final_eps"],
     )
-    '''
 
+    '''
     # ========= 修改開始 =========
     from pathlib import Path
     model_path = Path("models/DQN_alex_withrelu+adj/bestavgscorebyTA.zip")
@@ -334,7 +352,7 @@ if __name__ == "__main__":
             exploration_final_eps=my_config["exploration_final_eps"],
         )
     # ========= 修改結束 =========
-    
+    '''
     print(model.policy)
 
     train(eval_env, model, my_config)
