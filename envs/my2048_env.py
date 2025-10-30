@@ -136,12 +136,18 @@ class My2048Env(gym.Env):
             # [0.25 0.3  0.35 0.4 ]]
 
             # Automatically generate snake-like weight matrix
-            base = np.linspace(1.0, 0.2, 16).reshape(4, 4)
-            weight = np.zeros_like(base)
-            snake_indices = [(i, j if i % 2 == 0 else 3 - j) for i in range(4) for j in range(4)]
-            for idx, (x, y) in enumerate(snake_indices):
-                weight[x, y] = 1.0 - 0.05 * idx  # decrease gradually along snake path
+            # base = np.linspace(1.0, 0.2, 16).reshape(4, 4)
+            # weight = np.zeros_like(base)
+            # snake_indices = [(i, j if i % 2 == 0 else 3 - j) for i in range(4) for j in range(4)]
+            # for idx, (x, y) in enumerate(snake_indices):
+            #     weight[x, y] = 1.0 - 0.05 * idx  # decrease gradually along snake path
             #print("weight = ",weight)
+            weight = np.array([
+                [0.072,  0.041,   0.023,   0.012],
+                [0.14,   0.078,   0.042,   0.022],
+                [0.27,   0.15,    0.079,   0.041],
+                [0.52,   0.30,    0.16,    0.083]
+            ])
             weighted_score = np.sum((log_after_state - log_pre_state) * weight)
             #reward += 0.02 * weighted_score
             reward += weighted_score
@@ -157,11 +163,14 @@ class My2048Env(gym.Env):
                 step_bonus = 0.2 * np.log2(curr_max)
                 reward += step_bonus
             
+            num_empty_tiles = np.sum(self.Matrix == 0)   # count how many cells are empty
+            reward += 0.01 * num_empty_tiles
+            
             
         except IllegalMove:
             logging.debug("Illegal move")
             info['illegal_move'] = True
-            reward = self.illegal_move_reward + self.illegal_move_reward*self.foul_count
+            reward = self.illegal_move_reward + self.illegal_move_reward*0.08*self.foul_count
             self.foul_count += 1
             if self.foul_count >= 50: 
                 done = True

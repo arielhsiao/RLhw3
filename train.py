@@ -81,45 +81,45 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
         # Convert one-hot to discrete tile indices (0-15)
         tile_id = th.argmax(obs, dim=1)  # (B, 4, 4)
 
-        # ----- Pairwise adjacency (horizontal + vertical) -----
-        horiz_l = tile_id[:, :, :-1].reshape(B, -1)
-        horiz_r = tile_id[:, :, 1:].reshape(B, -1)
-        vert_t = tile_id[:, :-1, :].reshape(B, -1)
-        vert_b = tile_id[:, 1:, :].reshape(B, -1)
+        # # ----- Pairwise adjacency (horizontal + vertical) -----
+        # horiz_l = tile_id[:, :, :-1].reshape(B, -1)
+        # horiz_r = tile_id[:, :, 1:].reshape(B, -1)
+        # vert_t = tile_id[:, :-1, :].reshape(B, -1)
+        # vert_b = tile_id[:, 1:, :].reshape(B, -1)
 
-        first_pair = th.cat([horiz_l, vert_t], dim=1)
-        second_pair = th.cat([horiz_r, vert_b], dim=1)
-        n_pairs = first_pair.shape[1]
+        # first_pair = th.cat([horiz_l, vert_t], dim=1)
+        # second_pair = th.cat([horiz_r, vert_b], dim=1)
+        # n_pairs = first_pair.shape[1]
 
-        pair_matrix = th.zeros(B, n_pairs, 16, 16, device=dev)
-        b_idx = th.arange(B, device=dev).repeat_interleave(n_pairs)
-        p_idx = th.arange(n_pairs, device=dev).repeat(B)
-        a_flat, b_flat = first_pair.reshape(-1), second_pair.reshape(-1)
-        pair_matrix[b_idx, p_idx, a_flat, b_flat] = 1
+        # pair_matrix = th.zeros(B, n_pairs, 16, 16, device=dev)
+        # b_idx = th.arange(B, device=dev).repeat_interleave(n_pairs)
+        # p_idx = th.arange(n_pairs, device=dev).repeat(B)
+        # a_flat, b_flat = first_pair.reshape(-1), second_pair.reshape(-1)
+        # pair_matrix[b_idx, p_idx, a_flat, b_flat] = 1
 
-        # ----- Triplet adjacency (horizontal + vertical) -----
-        L = tile_id[:, :, :-2].reshape(B, -1)
-        C = tile_id[:, :, 1:-1].reshape(B, -1)
-        R = tile_id[:, :, 2:].reshape(B, -1)
-        T = tile_id[:, :-2, :].reshape(B, -1)
-        M = tile_id[:, 1:-1, :].reshape(B, -1)
-        D = tile_id[:, 2:, :].reshape(B, -1)
+        # # ----- Triplet adjacency (horizontal + vertical) -----
+        # L = tile_id[:, :, :-2].reshape(B, -1)
+        # C = tile_id[:, :, 1:-1].reshape(B, -1)
+        # R = tile_id[:, :, 2:].reshape(B, -1)
+        # T = tile_id[:, :-2, :].reshape(B, -1)
+        # M = tile_id[:, 1:-1, :].reshape(B, -1)
+        # D = tile_id[:, 2:, :].reshape(B, -1)
 
-        first_tri = th.cat([L, T], dim=1)
-        mid_tri = th.cat([C, M], dim=1)
-        last_tri = th.cat([R, D], dim=1)
-        n_triplets = first_tri.shape[1]
+        # first_tri = th.cat([L, T], dim=1)
+        # mid_tri = th.cat([C, M], dim=1)
+        # last_tri = th.cat([R, D], dim=1)
+        # n_triplets = first_tri.shape[1]
 
-        tri_tensor = th.zeros(B, n_triplets, 16, 16, 16, device=dev)
-        b_tri_idx = th.arange(B, device=dev).repeat_interleave(n_triplets)
-        seq_idx = th.arange(n_triplets, device=dev).repeat(B)
-        triples = th.stack([first_tri, mid_tri, last_tri], dim=2).reshape(-1, 3)
-        t1, t2, t3 = triples[:, 0], triples[:, 1], triples[:, 2]
-        tri_tensor[b_tri_idx, seq_idx, t1, t2, t3] = 1
+        # tri_tensor = th.zeros(B, n_triplets, 16, 16, 16, device=dev)
+        # b_tri_idx = th.arange(B, device=dev).repeat_interleave(n_triplets)
+        # seq_idx = th.arange(n_triplets, device=dev).repeat(B)
+        # triples = th.stack([first_tri, mid_tri, last_tri], dim=2).reshape(-1, 3)
+        # t1, t2, t3 = triples[:, 0], triples[:, 1], triples[:, 2]
+        # tri_tensor[b_tri_idx, seq_idx, t1, t2, t3] = 1
 
-        # ----- Flatten all features -----
-        flat_pairs = pair_matrix.reshape(B, -1)
-        flat_triplets = tri_tensor.reshape(B, -1)
+        # # ----- Flatten all features -----
+        # flat_pairs = pair_matrix.reshape(B, -1)
+        # flat_triplets = tri_tensor.reshape(B, -1)
         flat_obs = self.linear(self.cnn(obs))
         flat_obs = flat_obs.flatten(start_dim=1)
 
@@ -130,14 +130,14 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "DQN_ariel_cnnnoadj_allmodified",
+    "run_id": "envmodified_arieltraineval10",
     "algorithm": DQN,
     "policy_network": "CnnPolicy",
-    "save_path": "models/DQN_ariel_cnnnoadj_allmodified",
+    "save_path": "models/envmodified_arieltraineval10",
     "num_train_envs": 4,
     "epoch_num": 1500,
     "timesteps_per_epoch": 20000,
-    "eval_episode_num": 100,
+    "eval_episode_num": 10,
 
     ### DQN 參數
     "batch_size": 32,
