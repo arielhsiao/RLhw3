@@ -139,7 +139,7 @@ my_config = {
     "timesteps_per_epoch": 20000,
     "eval_episode_num": 10,
 
-    ### DQN 參數
+    ### DQN 
     "batch_size": 32,
     "learning_rate": 2e-4,
     "learning_starts": 100,
