@@ -130,27 +130,36 @@ class AdjacentTileFeatureExtractor(BaseFeaturesExtractor):
 
 # Set hyper params (configurations) for training
 my_config = {
-    "run_id": "envmodified_arieltraineval10",
-    "algorithm": DQN,
+    "run_id": "PPO-for-wandb-report-Q1",
+    "algorithm": PPO,
     "policy_network": "CnnPolicy",
-    "save_path": "models/envmodified_arieltraineval10",
+    "save_path": "models/PPO-for-wandb-report-Q1",
     "num_train_envs": 4,
     "epoch_num": 1500,
     "timesteps_per_epoch": 20000,
     "eval_episode_num": 10,
+    }
 
-    ### DQN 
-    "batch_size": 32,
-    "learning_rate": 2e-4,
-    "learning_starts": 100,
-    "buffer_size": 1000000,
-    "train_freq": (4, "step"),
-    "gradient_steps": 1,
-    "gamma": 0.99,
-    "target_update_interval": 10000,
-    "exploration_fraction": 0.1,
-    "exploration_final_eps": 0.05,
-}
+'''
+### DQN  
+"batch_size": 32,
+"learning_rate": 2e-4,
+#"learning_rate": 1e-4,
+#"learning_starts": 100,
+"learning_starts": 0,
+"buffer_size": 1000000,
+#"buffer_size": 200000,        
+"train_freq": (4, "step"),
+"gradient_steps": 1,
+"gamma": 0.99,
+"target_update_interval": 10000,
+#"target_update_interval":6000,
+"exploration_fraction": 0.1,
+"exploration_final_eps": 0.05,
+#"exploration_fraction": 0.04,
+#"exploration_final_eps": 0.02
+'''
+
 
 
 def make_env():
@@ -202,7 +211,7 @@ def train(eval_env, model, config):
     for epoch in range(config["epoch_num"]):
         epoch_start_time = time.time()
 
-        # Uncomment to enable wandb logging
+        # Uncomment to enable logging
         model.learn(
             total_timesteps=config["timesteps_per_epoch"],
             reset_num_timesteps=False,
@@ -238,7 +247,7 @@ def train(eval_env, model, config):
              "avg_score": avg_score}
         )
         
-        ### Save best model
+        ## Save best model
    
         if current_best_score < avg_score or current_best_highest < avg_highest:
             print("Saving New Best Model")
@@ -282,7 +291,7 @@ if __name__ == "__main__":
     run = wandb.init(
         project="assignment_3",
         config=my_config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        #sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
         id=my_config["run_id"]
     )
 
@@ -299,39 +308,40 @@ if __name__ == "__main__":
         net_arch=[] 
     )
 
-    # model = my_config["algorithm"](
-    #     my_config["policy_network"], 
-    #     train_env, 
-    #     verbose=1,
-    #     tensorboard_log=my_config["run_id"],
-    #     policy_kwargs=policy_kwargs,
-    # )
-
     model = my_config["algorithm"](
-        my_config["policy_network"],
-        train_env,
-        verbose=1,
+        my_config["policy_network"], 
+        train_env, 
+        verbose=0,
         tensorboard_log=my_config["run_id"],
         policy_kwargs=policy_kwargs,
-        learning_rate=my_config["learning_rate"],
-        batch_size=my_config["batch_size"],
-        buffer_size=my_config["buffer_size"],
-        train_freq=my_config["train_freq"],
-        gradient_steps=my_config["gradient_steps"],
-        gamma=my_config["gamma"],
-        target_update_interval=my_config["target_update_interval"],
-        exploration_fraction=my_config["exploration_fraction"],
-        exploration_final_eps=my_config["exploration_final_eps"],
     )
+    
+    # model = my_config["algorithm"](
+    #     my_config["policy_network"],
+    #     train_env,
+    #     verbose=0,
+    #     tensorboard_log=my_config["run_id"],
+    #     policy_kwargs=policy_kwargs,
+    #     learning_rate=my_config["learning_rate"],
+    #     batch_size=my_config["batch_size"],
+    #     buffer_size=my_config["buffer_size"],
+    #     train_freq=my_config["train_freq"],
+    #     gradient_steps=my_config["gradient_steps"],
+    #     gamma=my_config["gamma"],
+    #     target_update_interval=my_config["target_update_interval"],
+    #     exploration_fraction=my_config["exploration_fraction"],
+    #     exploration_final_eps=my_config["exploration_final_eps"],
+    #     #device="cuda"
+    # )
 
     '''
     # ========= 修改開始 =========
     from pathlib import Path
-    model_path = Path("models/DQN_alex_withrelu+adj/bestavgscorebyTA.zip")
-
+    model_path = Path("models/myenvmodified_arieltrain_evalchangeto10_gpu_addmonotonicityreward/bestavgscorebyTA.zip")
+    
     if model_path.exists():
         print(f"✅ Loading model from {model_path}")
-        model = DQN.load(model_path, env=train_env)
+        model = DQN.load(model_path, env=train_env, device = "cuda")
         model.set_env(train_env)  # 確保 VecEnv 正確綁定
     else:
         print("🚀 Starting new training from scratch")
@@ -350,9 +360,12 @@ if __name__ == "__main__":
             target_update_interval=my_config["target_update_interval"],
             exploration_fraction=my_config["exploration_fraction"],
             exploration_final_eps=my_config["exploration_final_eps"],
+            device="cuda"
         )
     # ========= 修改結束 =========
     '''
+
+
     print(model.policy)
 
     train(eval_env, model, my_config)
