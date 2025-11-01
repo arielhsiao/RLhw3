@@ -39,6 +39,53 @@ def stack(flat, layers=16):
     layered = np.transpose(layered, (2,0,1))
     return layered
 
+'''
+def monotonicity_score(logM):
+    """
+    Calculates the monotonicity score for a 4x4 log-board.
+    Rewards rows/columns that are either consistently increasing or decreasing.
+    
+    For each row, it calculates the score for (left < right) and (left > right)
+    and takes the one that is 'more true' (higher score).
+    It does the same for columns (top < bottom) and (top > bottom).
+    
+    The total score is the sum of the best score for rows and the best score for columns.
+    """
+    
+    # --- Row Scores ---
+    # Score for all rows being Left-to-Right INCREASING
+    # We sum the differences only where the condition is met (A[j] < A[j+1])
+    score_lr_inc = 0
+    # Score for all rows being Left-to-Right DECREASING
+    score_lr_dec = 0
+    
+    for i in range(4): # For each row
+        for j in range(3): # For each adjacent pair
+            diff = logM[i, j+1] - logM[i, j]
+            if diff > 0:       # Increasing
+                score_lr_inc += diff
+            elif diff < 0:     # Decreasing
+                score_lr_dec += abs(diff) # Add positive value
+
+    # --- Column Scores ---
+    # Score for all columns being Top-to-Bottom INCREASING
+    score_tb_inc = 0
+    # Score for all columns being Top-to-Bottom DECREASING
+    score_tb_dec = 0
+    
+    for j in range(4): # For each column
+        for i in range(3): # For each adjacent pair
+            diff = logM[i+1, j] - logM[i, j]
+            if diff > 0:       # Increasing
+                score_tb_inc += diff
+            elif diff < 0:     # Decreasing
+                score_tb_dec += abs(diff) # Add positive value
+
+    # The final score is the sum of the best direction for rows and the best for columns
+    # This rewards the board for having a dominant "gradient"
+    return max(score_lr_inc, score_lr_dec) + max(score_tb_inc, score_tb_dec)
+'''
+
 class My2048Env(gym.Env):
     metadata = {
         "render_modes": ['ansi', 'human', 'rgb_array'],
@@ -65,7 +112,7 @@ class My2048Env(gym.Env):
         self.observation_space = spaces.Box(0, 1, (layers, self.w, self.h), dtype=int)
         
         # TODO: Set negative reward (penalty) for illegal moves (optional)
-        self.set_illegal_move_reward(-10)
+        self.set_illegal_move_reward(-20)
         
         self.set_max_tile(None)
 
@@ -107,21 +154,32 @@ class My2048Env(gym.Env):
             'highest': 0,
             'score': 0,
         }
+        after_matrix = self.Matrix.copy()
+
         try:
             # assert info['illegal_move'] == False
-            pre_state = self.Matrix.copy()
-            log_pre_state = np.log2(pre_state + 1.0)
+            pre_matrix = self.Matrix.copy()
+            log_pre_state = np.log2(pre_matrix + 1.0)
             score = float(self.move(action))
-            log_after_state = np.log2(self.Matrix + 1.0)
             self.score += score
+            after_matrix = self.Matrix.copy()
+            log_after_state = np.log2(after_matrix + 1.0)
             assert score <= 2**(self.w*self.h)
+
             self.add_tile()
             done = self.isend()
-            score = np.tanh(np.log2(score + 1)/3) 
-            reward = 0.5*float(score)
+            tan_score = np.tanh(np.log2(score + 1)/3) 
+            reward = float(score)
 
             # TODO: Add reward according to weighted states (optional)
- 
+            ''' no try
+            weight = np.array([
+                    [1  , 0.5  , 0.5  , 1 ],
+                    [0.5  , 0  , 0  , 0.5  ],
+                    [0.5  , 0  , 0  , 0.5  ],
+                    [1  , 0.5  , 0.5  , 1  ]
+                    ])
+            '''
 
             # weight =  [[1.   0.95 0.9  0.85]
             # [0.65 0.7  0.75 0.8 ]
@@ -135,37 +193,55 @@ class My2048Env(gym.Env):
             # for idx, (x, y) in enumerate(snake_indices):
             #     weight[x, y] = 1.0 - 0.05 * idx  # decrease gradually along snake path
             #print("weight = ",weight)
-            weight = np.array([
-                [0.072,  0.041,   0.023,   0.012],
-                [0.14,   0.078,   0.042,   0.022],
-                [0.27,   0.15,    0.079,   0.041],
-                [0.52,   0.30,    0.16,    0.083]
-            ])
+            # weight = np.array([
+            #     [0.072,  0.041,   0.023,   0.012],
+            #     [0.14,   0.078,   0.042,   0.022],
+            #     [0.27,   0.15,    0.079,   0.041],
+            #     [0.52,   0.30,    0.16,    0.083]
+            # ])
+            # weight = np.array([[0.0625,   0.03125,  0.015625,  0.0078125],
+            # [0.125,    0.0625,   0.03125,   0.015625 ],
+            # [0.25,     0.125,    0.0625,    0.03125  ],
+            # [0.5,      0.25,     0.125,     0.0625   ]])
+            weight = np.array([[0.0625,   0.03125,  0.015625,  0.0078125],
+            [0.125,    0.0625,   0.03125,   0.015625 ],
+            [0.25,     0.125,    0.0625,    0.03125  ],
+            [0.5,      0.25,     0.125,     0.0625   ]])
             weighted_score = np.sum((log_after_state - log_pre_state) * weight)
             #reward += 0.02 * weighted_score
             reward += weighted_score
 
-            curve_prelog = -(np.sum(np.abs(log_pre_state[:,1:]-log_pre_state[:,:-1]))+np.sum(np.abs(log_pre_state[1:, :] - log_pre_state[:-1, :])))
-            curve_afterlog = -(np.sum(np.abs(log_after_state[:,1:]-log_after_state[:,:-1]))+np.sum(np.abs(log_after_state[1:, :] - log_after_state[:-1, :])))
-            curve_delta = curve_prelog - curve_afterlog
-            reward += 0.05 * curve_delta
+            # curve_prelog = -(np.sum(np.abs(log_pre_state[:,1:]-log_pre_state[:,:-1]))+np.sum(np.abs(log_pre_state[1:, :] - log_pre_state[:-1, :])))
+            # curve_afterlog = -(np.sum(np.abs(log_after_state[:,1:]-log_after_state[:,:-1]))+np.sum(np.abs(log_after_state[1:, :] - log_after_state[:-1, :])))
+            # curve_delta = curve_afterlog - curve_prelog 
+            # reward += 0.05 * curve_delta
 
-            prev_max = np.max(pre_state)
-            curr_max = np.max(self.Matrix)
-            if curr_max > prev_max:
-                step_bonus = 0.2 * np.log2(curr_max)
-                reward += step_bonus
-            
+            # prev_max = np.max(pre_matrix)
+            # curr_max = np.max(after_matrix)
+            # if curr_max > prev_max:
+            #     step_bonus = 0.1 * np.log2(curr_max)
+            #     reward += step_bonus
+
+            def smoothness(logM):
+                diff_x = np.sum(np.abs(np.diff(logM, axis=0)))
+                diff_y = np.sum(np.abs(np.diff(logM, axis=1)))
+                return -(diff_x + diff_y) 
+            delta_smooth = smoothness(log_after_state) - smoothness(log_pre_state)
+            reward += 0.05*delta_smooth
+
             num_empty_tiles = np.sum(self.Matrix == 0)   # count how many cells are empty
-            reward += 0.01 * num_empty_tiles
-            
+            reward += 0.0005 * num_empty_tiles
+
+            #print("tan_core, weighted_score, curve_delt =", tan_score, weighted_score, curve_delta, " -> final:", reward)
+            #delta_monotonicity = monotonicity_score(log_after_state) - monotonicity_score(log_pre_state)
+            #reward += 0.001 * delta_monotonicity
             
         except IllegalMove:
             logging.debug("Illegal move")
             info['illegal_move'] = True
             reward = self.illegal_move_reward + self.illegal_move_reward*0.08*self.foul_count
             self.foul_count += 1
-            if self.foul_count >= 50: 
+            if self.foul_count >= 40: 
                 done = True
             # TODO: Modify this part for the agent to have a chance to explore other actions (optional)
             
@@ -175,6 +251,7 @@ class My2048Env(gym.Env):
 
         # Return observation (board state), reward, done, truncate and info dict
         return stack(self.Matrix), reward, done, truncate, info
+    
 
     def reset(self, seed=None, options=None):
         self.seed(seed=seed)
