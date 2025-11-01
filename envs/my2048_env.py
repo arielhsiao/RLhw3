@@ -121,14 +121,7 @@ class My2048Env(gym.Env):
             reward = 0.5*float(score)
 
             # TODO: Add reward according to weighted states (optional)
-            '''
-            weight = np.array([
-                    [1  , 0.5  , 0.5  , 1 ],
-                    [0.5  , 0  , 0  , 0.5  ],
-                    [0.5  , 0  , 0  , 0.5  ],
-                    [1  , 0.5  , 0.5  , 1  ]
-                    ])
-            '''
+ 
 
             # weight =  [[1.   0.95 0.9  0.85]
             # [0.65 0.7  0.75 0.8 ]
